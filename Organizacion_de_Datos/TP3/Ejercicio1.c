@@ -4,9 +4,13 @@
 
 #define MAX 50
 #define MAX_CORREDORES 12000
-#define TAM_HASH 12007
+#define TAM_HASH MAX_CORREDORES
 #define ACTIVO 1
 #define INACTIVO 0
+
+// ==============================
+// Estructuras de datos
+// ==============================
 
 typedef struct {
     int dni;
@@ -18,17 +22,31 @@ typedef struct {
     unsigned short int activo;
 } Treg;
 
+int tabla_hash[TAM_HASH];
+
+// ==============================
+// Prototipos
+// ==============================
 // Prototipos de funciones
 int hash_function(int dni);
-int buscar_posicion(FILE* f, int dni, int* posicion);
+int resolver_colision_sondeo_lineal(int pos_inicial, int dni, int* encontrado);
+int resolver_posicion_hash(int dni, int crear);
+void eliminar_dni_de_hash(int dni);
+void inicializar_tabla_hash(void);
+void reconstruir_tabla_hash(FILE* f);
 void inicializar_archivo(FILE* f);
 int alta_corredor(FILE* f, Treg corredor);
 int baja_corredor(FILE* f, int dni);
 int modificar_corredor(FILE* f, int dni, Treg nuevo_datos);
-int cargar_tiempo(FILE* f, int dni, char* tiempo);
+int cargar_tiempo(FILE* f, int dni, const char* tiempo);
 void listar_tiempos_general(FILE* f);
-void listar_tiempos_categoria(FILE* f, char* categoria);
+void listar_tiempos_categoria(FILE* f, const char* categoria);
+void mostrar_tabla_hash(void);
 void mostrar_menu();
+
+// ==============================
+// Programa principal
+// ==============================
 
 int main() {
     FILE* archDatos;
@@ -38,7 +56,7 @@ int main() {
     char tiempo_temp[9];
     char categoria_buscar[MAX];
 
-    // Verificar si el archivo existe
+    // Abre archivo existente; si no existe, lo crea e inicializa.
     archDatos = fopen("datos_carrera.dat", "rb+");
     if (archDatos == NULL) {
         // Si no existe, crear y inicializar
@@ -54,6 +72,10 @@ int main() {
         archDatos = fopen("datos_carrera.dat", "rb+");
     }
 
+    inicializar_tabla_hash();
+    reconstruir_tabla_hash(archDatos);
+
+    // Construye el indice hash en memoria a partir del archivo.
     do {
         mostrar_menu();
         scanf("%d", &opcion);
@@ -73,7 +95,7 @@ int main() {
                 scanf("%hu", &corredor.edad);
                 fflush(stdin);
                 printf("Categoria: ");
-                fgets(corredor.categoria, MAX, stdin);
+                scanf(" %[^\n]", corredor.categoria);
                 corredor.categoria[strcspn(corredor.categoria, "\n")] = 0;
                 strcpy(corredor.tiempo, "");
                 corredor.activo = ACTIVO;
@@ -157,6 +179,11 @@ int main() {
                 printf("Saliendo del sistema...\n");
                 break;
 
+            case 8:  // Ver tabla hash
+                printf("\n=== TABLA HASH (DNI) ===\n");
+                mostrar_tabla_hash();
+                break;
+
             default:
                 printf("Opcion invalida\n");
         }
@@ -182,89 +209,156 @@ void mostrar_menu() {
     printf("5. Listado general de tiempos\n");
     printf("6. Listado de tiempos por categoria\n");
     printf("7. Salir\n");
+    printf("8. Mostrar tabla hash\n");
     printf("========================================\n");
     printf("Seleccione una opcion: ");
 }
 
-// Función hash: usa número primo (12007) para mejor distribución
-// Puede retornar valores 0-12006 (se ajustan al rango en las funciones)
+void mostrar_tabla_hash(void) {
+    int i;
+    int ocupadas = 0;
+
+    printf("%-10s %-12s\n", "Indice", "DNI");
+    printf("------------------------\n");
+
+    for (i = 0; i < TAM_HASH; i++) {
+        if (tabla_hash[i] != 0) {
+            printf("%-10d %-12d\n", i, tabla_hash[i]);
+            ocupadas++;
+        }
+    }
+
+    printf("------------------------\n");
+    printf("Celdas ocupadas: %d de %d\n", ocupadas, TAM_HASH);
+}
+
+// ==============================
+// Funciones de hash
+// ==============================
+
+// Funcion hash para DNI.
 int hash_function(int dni) {
     return dni % TAM_HASH;
 }
 
-// Busca la posición de un DNI en el archivo usando linear probing
-// Retorna 0 si encuentra el DNI, -1 si no existe, guarda la posición en *posicion
-int buscar_posicion(FILE* f, int dni, int* posicion) {
+int resolver_colision_sondeo_lineal(int pos_inicial, int dni, int* encontrado) {
+    int i;
+
+    // Primer tramo: desde la posicion hash hasta el final de la tabla.
+    for (i = pos_inicial; i < TAM_HASH; i++) {
+        if (tabla_hash[i] == dni) {
+            *encontrado = 1;
+            return i;
+        }
+
+        if (tabla_hash[i] == 0) {
+            *encontrado = 0;
+            return i;
+        }
+    }
+
+    // Segundo tramo: desde el inicio hasta la posicion hash - 1.
+    for (i = 0; i < pos_inicial; i++) {
+        if (tabla_hash[i] == dni) {
+            *encontrado = 1;
+            return i;
+        }
+
+        if (tabla_hash[i] == 0) {
+            *encontrado = 0;
+            return i;
+        }
+    }
+
+    *encontrado = 0;
+    return -1;
+}
+
+// Busca o inserta un DNI en la tabla hash.
+// crear=0: solo busca. crear=1: inserta cuando no existe.
+// Retorna el indice hash (que coincide con la posicion fisica).
+int resolver_posicion_hash(int dni, int crear) {
     int pos_inicial = hash_function(dni);
+    int encontrado;
+    int idx = resolver_colision_sondeo_lineal(pos_inicial, dni, &encontrado);
 
-    // Ajustar si el hash retornó valor fuera del rango del archivo (12000-12006)
-    if (pos_inicial >= MAX_CORREDORES) {
-        pos_inicial = pos_inicial % MAX_CORREDORES;
+    if (idx == -1) {
+        return -1;
     }
 
-    int pos_actual = pos_inicial;
+    if (encontrado) {
+        return idx;
+    }
+
+    if (!crear) {
+        return -1;
+    }
+
+    tabla_hash[idx] = dni;
+    return idx;
+}
+
+void eliminar_dni_de_hash(int dni) {
+    int pos_inicial = hash_function(dni);
+    int encontrado;
+    int idx = resolver_colision_sondeo_lineal(pos_inicial, dni, &encontrado);
+
+    if (idx == -1 || !encontrado) {
+        return;
+    }
+
+    tabla_hash[idx] = 0;
+
+    // Reinserta la corrida para mantener consistente el sondeo lineal.
+    for (;;) {
+        int siguiente = idx + 1;
+        int dni_reinsertar;
+
+        if (siguiente >= TAM_HASH) {
+            siguiente = 0;
+        }
+
+        if (tabla_hash[siguiente] == 0) {
+            break;
+        }
+
+        dni_reinsertar = tabla_hash[siguiente];
+
+        tabla_hash[siguiente] = 0;
+
+        resolver_posicion_hash(dni_reinsertar, 1);
+        idx = siguiente;
+    }
+}
+
+void inicializar_tabla_hash(void) {
+    int i;
+
+    for (i = 0; i < TAM_HASH; i++) {
+        tabla_hash[i] = 0;
+    }
+}
+
+// Reconstruye la tabla hash leyendo los registros activos del archivo.
+void reconstruir_tabla_hash(FILE* f) {
+    int i;
     Treg temp;
-    int intentos = 0;
 
-    do {
-        fseek(f, pos_actual * sizeof(Treg), SEEK_SET);
-        fread(&temp, sizeof(Treg), 1, f);
-
-        // Si encontramos el DNI y está activo
-        if (temp.dni == dni && temp.activo == ACTIVO) {
-            *posicion = pos_actual;
-            return 0;  // Encontrado
+    fseek(f, 0, SEEK_SET);
+    for (i = 0; i < MAX_CORREDORES; i++) {
+        if (fread(&temp, sizeof(Treg), 1, f) != 1) {
+            break;
         }
 
-        // Si la posición está inactiva o vacía, podría ser lugar para insertar
-        if (temp.activo == INACTIVO || temp.dni == 0) {
-            *posicion = pos_actual;
-            return -1;  // No encontrado, pero posición disponible
-        }
-
-        // Linear probing: siguiente posición (con wrap-around en MAX_CORREDORES)
-        pos_actual = (pos_actual + 1) % MAX_CORREDORES;
-        intentos++;
-
-    } while (pos_actual != pos_inicial && intentos < MAX_CORREDORES);
-
-    *posicion = -1;
-    return -1;  // Archivo lleno o no encontrado
-}
-
-int buscapos(unsigned long int dni, FILE* arch) {
-    int pos = hash_function(dni), i;
-    Treg registro;
-
-    if (pos > 12000 && pos <= 12006) {  // hash invalido
-        pos = 0;                        // reinicia y busca lineal en caso de que la primera posicion este ocupada
-    }
-
-    fseek(arch, pos, SEEK_SET);
-    fread(&registro, sizeof(registro), 1, arch);
-
-    if (registro.activo) {
-        // solucionar colision
-        i = pos;
-        while (fread(&registro, sizeof(registro), 1, arch) == 1 && registro.activo)
-            i++;
-
-        if (registro.activo) {  // si no encotro delante, busca detras
-            fseek(arch, 0, SEEK_SET);
-            i = 0;
-            while (fread(&registro, sizeof(registro), 1, arch) == 1 && registro.activo && i < pos)
-                i++;
-
-            if (i < pos && !registro.activo)
-                pos = i;  // encontro posicion
-            else
-                pos = -1;  // archivo lleno
-        } else {
-            pos = i;
+        if (temp.dni != 0 && temp.activo == ACTIVO) {
+            resolver_posicion_hash(temp.dni, 1);
         }
     }
-    return pos;
 }
+
+// ==============================
+// Funciones de archivo
+// ==============================
 
 // Inicializa el archivo con 12000 registros vacíos
 void inicializar_archivo(FILE* f) {
@@ -286,74 +380,83 @@ void inicializar_archivo(FILE* f) {
     fflush(f);
 }
 
-// Alta de corredor: registra un nuevo corredor usando hash
+// Alta de corredor: usa hash para obtener posicion y luego escribe en archivo.
 int alta_corredor(FILE* f, Treg corredor) {
-    int pos_inicial = hash_function(corredor.dni);
+    int pos_fisica = resolver_posicion_hash(corredor.dni, 0);
+    Treg existente;
 
-    // Ajustar si el hash retornó valor fuera del rango del archivo (12000-12006)
-    if (pos_inicial >= MAX_CORREDORES) {
-        pos_inicial = pos_inicial % MAX_CORREDORES;
-    }
+    if (pos_fisica != -1) {
+        fseek(f, pos_fisica * sizeof(Treg), SEEK_SET);
+        if (fread(&existente, sizeof(Treg), 1, f) != 1) {
+            return -1;
+        }
 
-    int pos_actual = pos_inicial;
-    Treg temp;
-    int intentos = 0;
-
-    // Buscar posición libre usando linear probing
-    do {
-        fseek(f, pos_actual * sizeof(Treg), SEEK_SET);
-        fread(&temp, sizeof(Treg), 1, f);
-
-        // Verificar si el DNI ya existe y está activo
-        if (temp.dni == corredor.dni && temp.activo == ACTIVO) {
+        if (existente.activo == ACTIVO) {
             printf("Error: El DNI ya esta registrado\n");
             return -1;
         }
 
-        // Si encontramos posición libre (inactiva o vacía)
-        if (temp.activo == INACTIVO || temp.dni == 0) {
-            fseek(f, pos_actual * sizeof(Treg), SEEK_SET);
-            fwrite(&corredor, sizeof(Treg), 1, f);
-            fflush(f);
-            printf("Corredor registrado en posicion: %d\n", pos_actual);
-            return 0;
-        }
+        fseek(f, pos_fisica * sizeof(Treg), SEEK_SET);
+        fwrite(&corredor, sizeof(Treg), 1, f);
+        fflush(f);
+        printf("Corredor registrado en posicion: %d\n", pos_fisica);
+        return 0;
+    }
 
-        pos_actual = (pos_actual + 1) % MAX_CORREDORES;
-        intentos++;
+    pos_fisica = resolver_posicion_hash(corredor.dni, 1);
+    if (pos_fisica == -1) {
+        printf("Error: Tabla hash sin espacio\n");
+        return -1;
+    }
 
-    } while (pos_actual != pos_inicial && intentos < MAX_CORREDORES);
-
-    printf("Error: No hay cupo disponible\n");
-    return -1;
+    fseek(f, pos_fisica * sizeof(Treg), SEEK_SET);
+    fwrite(&corredor, sizeof(Treg), 1, f);
+    fflush(f);
+    printf("Corredor registrado en posicion: %d\n", pos_fisica);
+    return 0;
 }
 
-// Baja lógica: marca el corredor como inactivo
+// Baja logica: marca inactivo en archivo y elimina DNI del indice hash.
 int baja_corredor(FILE* f, int dni) {
-    int posicion;
+    int posicion = resolver_posicion_hash(dni, 0);
     Treg corredor;
 
-    if (buscar_posicion(f, dni, &posicion) == 0) {
+    if (posicion != -1) {
         fseek(f, posicion * sizeof(Treg), SEEK_SET);
-        fread(&corredor, sizeof(Treg), 1, f);
+        if (fread(&corredor, sizeof(Treg), 1, f) != 1) {
+            return -1;
+        }
+
+        if (corredor.dni != dni || corredor.activo != ACTIVO) {
+            return -1;
+        }
+
         corredor.activo = INACTIVO;
         fseek(f, posicion * sizeof(Treg), SEEK_SET);
         fwrite(&corredor, sizeof(Treg), 1, f);
         fflush(f);
+
+        eliminar_dni_de_hash(dni);
         return 0;
     }
     return -1;
 }
 
-// Modifica los datos de un corredor existente
+// Modifica un corredor existente manteniendo su tiempo previo si ya lo tenia.
 int modificar_corredor(FILE* f, int dni, Treg nuevo_datos) {
-    int posicion;
+    int posicion = resolver_posicion_hash(dni, 0);
 
-    if (buscar_posicion(f, dni, &posicion) == 0) {
+    if (posicion != -1) {
         // Mantener el tiempo anterior si existe
         Treg anterior;
         fseek(f, posicion * sizeof(Treg), SEEK_SET);
-        fread(&anterior, sizeof(Treg), 1, f);
+        if (fread(&anterior, sizeof(Treg), 1, f) != 1) {
+            return -1;
+        }
+
+        if (anterior.dni != dni || anterior.activo != ACTIVO) {
+            return -1;
+        }
 
         if (strlen(anterior.tiempo) > 0) {
             strcpy(nuevo_datos.tiempo, anterior.tiempo);
@@ -367,14 +470,21 @@ int modificar_corredor(FILE* f, int dni, Treg nuevo_datos) {
     return -1;
 }
 
-// Carga el tiempo de carrera de un corredor
-int cargar_tiempo(FILE* f, int dni, char* tiempo) {
-    int posicion;
+// Carga/actualiza el tiempo de carrera de un corredor existente.
+int cargar_tiempo(FILE* f, int dni, const char* tiempo) {
+    int posicion = resolver_posicion_hash(dni, 0);
     Treg corredor;
 
-    if (buscar_posicion(f, dni, &posicion) == 0) {
+    if (posicion != -1) {
         fseek(f, posicion * sizeof(Treg), SEEK_SET);
-        fread(&corredor, sizeof(Treg), 1, f);
+        if (fread(&corredor, sizeof(Treg), 1, f) != 1) {
+            return -1;
+        }
+
+        if (corredor.dni != dni || corredor.activo != ACTIVO) {
+            return -1;
+        }
+
         strcpy(corredor.tiempo, tiempo);
         fseek(f, posicion * sizeof(Treg), SEEK_SET);
         fwrite(&corredor, sizeof(Treg), 1, f);
@@ -384,7 +494,11 @@ int cargar_tiempo(FILE* f, int dni, char* tiempo) {
     return -1;
 }
 
-// Función auxiliar para comparar tiempos (para qsort)
+// ==============================
+// Funciones de listados
+// ==============================
+
+// Funcion auxiliar para comparar tiempos (para qsort).
 int comparar_tiempos(const void* a, const void* b) {
     Treg* corredor_a = (Treg*)a;
     Treg* corredor_b = (Treg*)b;
@@ -396,17 +510,24 @@ int comparar_tiempos(const void* a, const void* b) {
     return strcmp(corredor_a->tiempo, corredor_b->tiempo);
 }
 
-// Lista todos los tiempos ordenados
+// Lista todos los tiempos cargados.
 void listar_tiempos_general(FILE* f) {
-    int i, count = 0;
+    int i;
+    Treg temp;
 
     printf("\n%-10s %-30s %-10s %-10s\n", "DNI", "Nombre", "Categoria", "Tiempo");
     printf("-----------------------------------------------------------------------\n");
-    // Leer todos los corredores activos con tiempo
-    fseek(f, 0, SEEK_SET);
-    for (i = 0; i < MAX_CORREDORES; i++) {
-        Treg temp;
-        fread(&temp, sizeof(Treg), 1, f);
+    // Recorre la tabla hash y accede directo al registro del archivo.
+    for (i = 0; i < TAM_HASH; i++) {
+        if (tabla_hash[i] == 0) {
+            continue;
+        }
+
+        fseek(f, i * sizeof(Treg), SEEK_SET);
+        if (fread(&temp, sizeof(Treg), 1, f) != 1) {
+            continue;
+        }
+
         if (temp.activo == ACTIVO && strlen(temp.tiempo) > 0) {
             printf("%-10d %-30s %-10s %-10s\n",
                    temp.dni,
@@ -417,18 +538,25 @@ void listar_tiempos_general(FILE* f) {
     }
 }
 
-// Lista tiempos filtrados por categoría
-void listar_tiempos_categoria(FILE* f, char* categoria) {
-    int i, count = 0;
+// Lista tiempos filtrados por categoria.
+void listar_tiempos_categoria(FILE* f, const char* categoria) {
+    int i;
+    Treg temp;
 
     printf("\nCategoria: %s\n", categoria);
     printf("%-10s %-30s %-10s\n", "DNI", "Nombre", "Tiempo");
     printf("-----------------------------------------------------------------------\n");
-    // Leer corredores activos con tiempo de la categoría especificada
-    fseek(f, 0, SEEK_SET);
-    for (i = 0; i < MAX_CORREDORES; i++) {
-        Treg temp;
-        fread(&temp, sizeof(Treg), 1, f);
+    // Recorre la tabla hash y accede directo al registro del archivo.
+    for (i = 0; i < TAM_HASH; i++) {
+        if (tabla_hash[i] == 0) {
+            continue;
+        }
+
+        fseek(f, i * sizeof(Treg), SEEK_SET);
+        if (fread(&temp, sizeof(Treg), 1, f) != 1) {
+            continue;
+        }
+
         if (temp.activo == ACTIVO &&
             strlen(temp.tiempo) > 0 &&
             strcmp(temp.categoria, categoria) == 0) {
