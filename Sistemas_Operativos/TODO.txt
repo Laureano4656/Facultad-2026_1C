@@ -1,0 +1,44 @@
+Introducción a los sistemas operativos
+	Clase presencial F no hay video hay que leer bibliografia
+	Apoyo.pdf		43F
+
+	TP conceptos 		12E
+
+Procesos - Administración del Procesador
+	Clase procesos		1h40m	https://youtu.be/XMGlzYqLRSs
+	procesos.pdf		43F
+
+	planificación 		25m	https://www.youtube.com/watch?v=_AAqK5tSBsM&ab_channel=AnaHaydeeDiIorio
+	planificacion.pdf	10F
+
+	TP AdmPro		14E
+
+Sistema de Archivos (FYLE SYSTEM)
+	Clase fileSystem	2h	https://youtu.be/rfO3ldxt2Dg
+	filesystem.pdf		53F
+	TP filesystem		18E
+
+Administración de la Memoria
+	Clase memoria		2h	https://youtu.be/qJ5mmEgeo0s
+	TP memoria		9E
+	Ejemplo planificacion CPU con memoria
+
+Memoria virtual
+	Clave virtual memory	1h46m	https://youtu.be/DmxYjOdzcX0
+	Ejemplo 		11m	https://www.youtube.com/watch?v=x5xDwqmVbx8&feature=youtu.be&ab_channel=SistemasOperativos
+	TP virutal memoria	9E
+
+Administración de dispositivos de I/O - RAID
+	Clase E/S		52m	https://www.youtube.com/watch?v=pDBF29h0pD0&ab_channel=SistemasOperativos
+	E-S.pdf			42F
+	raid			26m	https://www.youtube.com/watch?v=O_ALuHOQbws&feature=youtu.be&ab_channel=SistemasOperativos
+	raid.pdf		20F
+	TP dipositivos - raid	13E
+
+Seguridad
+	Clase seguridad		??	falta link
+
+Proteccion
+	TP protec y segurida	12E
+	Clase proteccion	1h10m	https://youtu.be/X5C1cPfDZZw
+
