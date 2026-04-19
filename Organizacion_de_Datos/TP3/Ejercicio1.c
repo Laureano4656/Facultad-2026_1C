@@ -4,7 +4,7 @@
 
 #define MAX 50
 #define MAX_CORREDORES 12000
-#define TAM_HASH MAX_CORREDORES
+#define TAM_HASH 12007
 #define ACTIVO 1
 #define INACTIVO 0
 

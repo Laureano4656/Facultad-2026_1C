@@ -24,11 +24,11 @@ THashTable tabla_hash;
 int resolver_colision(FILE* archOverflow, int pos_inicial, char* clave, int* encontrado) {
     TRegEmpleado actual;
 
-    // Primer tramo: desde la posicion hash hasta el final de la tabla.
     if (strcmp(tabla_hash[pos_inicial].nyap, clave) == 0) {
         *encontrado = 1;
         return pos_inicial;
     }
+    // Primer tramo: desde la posicion hash hasta el final de la tabla.
     for (int i = pos_inicial; i < TAM_HASH; i++) {
         fseek(archOverflow, pos_inicial * sizeof(TRegEmpleado), SEEK_SET);
         fread(&actual, sizeof(TRegEmpleado), 1, archOverflow);
@@ -89,9 +89,9 @@ void alta_empleado(TRegEmpleado nuevo) {
 
     int pos_home = funcion_hash(nuevo.nyap);
     TRegEmpleado actual;
-    if (strcmp(tabla_hash[pos_home].nyap, nuevo.nyap) == 0) {
+    if (strcmp(tabla_hash[pos_home].nyap, nuevo.nyap) != 0 && tabla_hash[pos_home].nyap[0] != '\0') {
         int encontrado;
-        int idx = resolver_colision(pos_home, , &encontrado);
+        int idx = resolver_colision(fo, pos_home, nuevo.nyap, &encontrado);
         // escribo en archivo overflow
         fseek(fo, (pos_home + idx) * sizeof(TRegEmpleado), SEEK_SET);
         fwrite(&nuevo, sizeof(TRegEmpleado), 1, fo);
@@ -114,7 +114,7 @@ void modificar_empleado(char* clave, char* nueva_dir, char* nuevo_tel) {
     fseek(fp, pos_home * sizeof(TRegEmpleado), SEEK_SET);
     fread(&actual, sizeof(TRegEmpleado), 1, fp);
 
-    if (actual.estado == 1 && strcmp(tabla_hash[pos_home].nyap, nuevo.nyap) == 0) {
+    if (strcmp(tabla_hash[pos_home].nyap, nuevo.nyap) == 0 && actual.estado == 1) {
         // lo encontre en el archivo principal, debo modificar.
         strcpy(actual.direccion, nueva_dir);
         strcpy(actual.telefono, nuevo_tel);
@@ -128,10 +128,12 @@ void modificar_empleado(char* clave, char* nueva_dir, char* nuevo_tel) {
         else {
             // debo buscar en overflow
             int encontrado;
-            int idx = resolver_colision(pos_home, , &encontrado);
+            int idx = resolver_colision(fo, pos_home, nuevo.nyap, &encontrado);
             if (encontrado) {
+                strcpy(actual.direccion, nueva_dir);
+                strcpy(actual.telefono, nuevo_tel);
                 fseek(fo, (pos_home + idx) * sizeof(TRegEmpleado), SEEK_SET);
-                fwrite(&nuevo, sizeof(TRegEmpleado), 1, fo);
+                fwrite(&actual, sizeof(TRegEmpleado), 1, fo);
                 printf("Modificado en overflow\n");
             }
         }
@@ -151,7 +153,7 @@ void baja_empleado(char* clave) {
     if (strcmp(tabla_hash[pos_home].nyap, clave) == 0) {
         fseek(fp, pos_home * sizeof(TRegEmpleado), SEEK_SET);
         fread(&actual, sizeof(TRegEmpleado), 1, fp);
-        if (actual.estado == 1 && strcmp(tabla_hash[pos_home].nyap, clave) == 0) {
+        if (actual.estado == 1 && strcmp(actual.nyap, clave) == 0) {
             actual.estado = 2;
             fseek(fp, pos_home * sizeof(TRegEmpleado), SEEK_SET);
             fwrite(&actual, sizeof(TRegEmpleado), 1, fp);
@@ -161,7 +163,7 @@ void baja_empleado(char* clave) {
                 printf("Posicion invalida \n");
             } else {
                 int encontrado;
-                int idx = resolver_colision(pos_home, , &encontrado);
+                int idx = resolver_colision(fo, pos_home, clave, &encontrado);
                 if (encontrado) {
                     fseek(fo, (pos_home + idx) * sizeof(TRegEmpleado), SEEK_SET);
                     fwrite(&actual, sizeof(TRegEmpleado), 1, fo);
@@ -173,7 +175,7 @@ void baja_empleado(char* clave) {
         fseek(fo, pos_home * sizeof(TRegEmpleado), SEEK_SET);
         fread(&actual, sizeof(TRegEmpleado), 1, fo);
         int encontrado;
-        int idx = resolver_colision(pos_home, , &encontrado);
+        int idx = resolver_colision(fo, pos_home, clave, &encontrado);
         if (encontrado) {
             fseek(fo, (pos_home + idx) * sizeof(TRegEmpleado), SEEK_SET);
             fwrite(&actual, sizeof(TRegEmpleado), 1, fo);
