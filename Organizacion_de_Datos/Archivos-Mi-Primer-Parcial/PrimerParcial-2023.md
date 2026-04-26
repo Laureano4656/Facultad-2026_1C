@@ -370,9 +370,9 @@ DOCENTE\_A\_CARGO (CHAR 8)
 
 
 
-Respuesta: Accedo al archivo cursadas 
+Respuesta: Accedo al archivo cursadas
 
-Busco el ID\_CURSADA DONDE ID\_Materia = 6A7 y AÑO = AÑO\_1|AÑO\_2 
+Busco el ID\_CURSADA DONDE ID\_Materia = 6A7 y AÑO = AÑO\_1|AÑO\_2
 
 Una vez con el ID\_CURSADA accedo al archivo inscripcion y luego por cada coincidencia tomo el ID\_ALUMNO y accedo al archivo alumnos.
 
@@ -448,7 +448,7 @@ c) PERRO
 
 
 
-a) 
+a)
 
 PERRO OR CABALLO. Justificación: El motor debe recuperar la lista completa de "PERRO" y la lista completa de "CABALLO". Al ser una operación OR, el conjunto resultante es el más grande posible (todos los documentos donde aparece al menos uno de los dos).
 
@@ -458,13 +458,13 @@ PERRO. Justificación: Es la operación más simple. El motor busca el término 
 
 
 
-b) 
+b)
 
 En el caso del OR se realiza una UNION entre ambos conjuntos.
 
 En el caso del AND se realiza una INTERSECCION entre ambos conjuntos.
 
-En el ultimo caso no se realiza ninguna operación. 
+En el ultimo caso no se realiza ninguna operación.
 
 
 
@@ -491,4 +491,16 @@ eficiencia que tienen los arboles respecto de las listas.
 V
 
 
+
+
+
+Probabilidad Infima de Colisiones -> Sondeo Lineal. Si casi nunca hay choques, buscás el lugar de al lado y listo. Es simple y no requiere estructuras extra.
+
+
+
+Gran cantidad de colisiones en pocas claves -> Encadenamiento. En lugar de concentrar todas las claves que colisionan en un mismo punto de la tabla principal, mediante el encadenamiento las guardo fuera de la tabla principal
+
+
+
+Gran cantidad de colisiones dispersas en las claves -> Doble Hashing. A diferencia del sondeo lineal, este utiliza una segunda función hash para calcular el "salto" o intervalo entre pruebas. Permitiendo asi una distribucion mas uniforme en el arreglo de la tabla. 
 
